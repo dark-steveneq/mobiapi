@@ -14,12 +14,11 @@ import (
 type MobiAPI struct {
 	client   http.Client
 	domain   string
-	uid      string
-	info     string
+	name     string
+	uid      int
 	signedin bool
 }
 
-// Convinience wrapper for http.NewRequest() and api.client.Do() that also returns goquery.Document
 func (api *MobiAPI) request(method string, path string, body string) (*http.Response, *goquery.Document, error) {
 	var resp *http.Response
 	var doc *goquery.Document
@@ -34,7 +33,6 @@ func (api *MobiAPI) request(method string, path string, body string) (*http.Resp
 	if method == "POST" {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	req.Header.Set("Information", api.info)
 
 	resp, err = api.client.Do(req)
 	if err != nil {
@@ -45,7 +43,7 @@ func (api *MobiAPI) request(method string, path string, body string) (*http.Resp
 	if err != nil {
 		return resp, doc, err
 	}
-	api.uid, api.signedin = doc.Find("body").Attr("uid")
+	_, api.signedin = doc.Find("body").Attr("uid")
 
 	return resp, doc, nil
 }
@@ -55,6 +53,7 @@ func (api *MobiAPI) SetDomain(domain string) error {
 	if !strings.Contains(domain, ".") {
 		domain = domain + ".mobidziennik.pl"
 	}
+	api.domain = domain
 	resp, _, err := api.request("GET", "", "")
 	if err != nil {
 		return err
@@ -62,44 +61,56 @@ func (api *MobiAPI) SetDomain(domain string) error {
 	if resp.StatusCode != 200 {
 		return errors.New("Inaccessible")
 	}
-	api.domain = domain
 	return nil
+}
+
+// Get user's name
+func (api *MobiAPI) GetName() string {
+	return api.name
+}
+
+// Get UID
+func (api *MobiAPI) GetUID() int {
+	return api.uid
 }
 
 // Set proxy server to use and whenever to allow invalid TLS certificates. Useful for development
 func (api *MobiAPI) SetupProxy(proxyurl string, noverifytls bool) error {
-	parsedurl, err := url.Parse(proxyurl)
-	if err != nil {
-		return err
-	}
-	api.client.Transport = &http.Transport{
-		Proxy:           http.ProxyURL(parsedurl),
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: noverifytls},
+	if proxyurl == "" {
+		api.client.Transport = &http.Transport{}
+	} else {
+		parsedurl, err := url.Parse(proxyurl)
+		if err != nil {
+			return err
+		}
+		api.client.Transport = &http.Transport{
+			Proxy:           http.ProxyURL(parsedurl),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: noverifytls},
+		}
+		if _, _, err := api.request("GET", "https://mobidziennik.pl", ""); err != nil {
+			api.client.Transport = &http.Transport{}
+			return err
+		}
 	}
 	return nil
 }
 
-// Disable proxy if you'd need to do so. It might not work, so it might kill your program.
-func (api *MobiAPI) KillProxy() {
-	api.client.Transport = &http.Transport{}
-}
-
-// Gracefully close connection to MobiDziennik.
-func (api *MobiAPI) Close() (bool, error) {
+// Logout from mobiDziennik
+func (api *MobiAPI) Logout() (bool, error) {
 	resp, _, err := api.request("GET", "wyloguj", "")
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
 	if resp.Request.Response.StatusCode == 302 {
 		api = nil
+		api.signedin = false
 		return true, nil
 	}
 	return false, nil
 }
 
 // Create new instance of MobiAPI.
-func New(domain string, info string) (*MobiAPI, error) {
+func New(domain string) (*MobiAPI, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -108,7 +119,6 @@ func New(domain string, info string) (*MobiAPI, error) {
 		client: http.Client{
 			Jar: jar,
 		},
-		info: info,
 	}
 	if len(domain) > 0 {
 		if err := api.SetDomain(domain); err != nil {

@@ -4,16 +4,28 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
+
+	"github.com/PuerkitoBio/goquery"
 )
+
+func (api *MobiAPI) postlogin(doc *goquery.Document) {
+	if val, exists := doc.Find("body").Attr("uid"); exists {
+		api.uid, _ = strconv.Atoi(val)
+		api.name = doc.Find("#botton div strong").Text()
+	}
+}
 
 // Authenticate with password.
 func (api *MobiAPI) PasswordAuth(login, password string) (bool, error) {
-	resp, _, err := api.request("POST", "logowanie", "login="+login+"&haslo="+password)
+	resp, doc, err := api.request("POST", "logowanie", "login="+login+"&haslo="+password)
 	if err != nil {
 		return false, err
 	}
 
 	if resp.Request.Response.StatusCode == 302 {
+		api.signedin = true
+		api.postlogin(doc)
 		return true, nil
 	}
 
@@ -40,7 +52,7 @@ func (api *MobiAPI) TokenAuth(token string) (bool, error) {
 		}
 	}
 
-	resp, _, err := api.request("GET", "logowanie", "")
+	resp, doc, err := api.request("GET", "logowanie", "")
 	if err != nil {
 		return false, err
 	}
@@ -49,6 +61,7 @@ func (api *MobiAPI) TokenAuth(token string) (bool, error) {
 		return false, errors.New("AuthUnable")
 	} else if resp.Request.Response.StatusCode == 302 {
 		api.signedin = true
+		api.postlogin(doc)
 		return true, nil
 	}
 
@@ -64,4 +77,10 @@ func (api *MobiAPI) LoggedIn(noprecache bool) bool {
 		}
 	}
 	return api.signedin
+}
+
+// Does a random request to extend session
+func (api *MobiAPI) ExtendSession() error {
+	_, _, err := api.request("POST", "", "")
+	return err
 }
