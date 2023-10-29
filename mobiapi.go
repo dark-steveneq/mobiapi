@@ -87,7 +87,7 @@ func (api *MobiAPI) SetupProxy(proxyurl string, noverifytls bool) error {
 			Proxy:           http.ProxyURL(parsedurl),
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: noverifytls},
 		}
-		if _, _, err := api.request("GET", "https://mobidziennik.pl", ""); err != nil {
+		if _, err := api.client.Get("https://mobidziennik.pl"); err != nil {
 			api.client.Transport = &http.Transport{}
 			return err
 		}
