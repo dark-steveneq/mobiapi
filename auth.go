@@ -18,6 +18,15 @@ func (api *MobiAPI) postlogin(doc *goquery.Document) {
 
 // Authenticate with password.
 func (api *MobiAPI) PasswordAuth(login, password string) (bool, error) {
+	if login == "" || password == "" {
+		return false, errors.New("EmptyCred")
+	}
+	purl, err := url.Parse("https://" + api.domain)
+	if err != nil {
+		return false, err
+	}
+	api.client.Jar.SetCookies(purl, []*http.Cookie{})
+
 	resp, doc, err := api.request("POST", "logowanie", "login="+login+"&haslo="+password)
 	if err != nil {
 		return false, err
@@ -40,10 +49,6 @@ func (api *MobiAPI) TokenAuth(token string) (bool, error) {
 	}
 	api.client.Jar.SetCookies(purl, []*http.Cookie{})
 
-	_, _, err = api.request("GET", "", "")
-	if err != nil {
-		return false, err
-	}
 	for _, cookie := range api.client.Jar.Cookies(purl) {
 		if cookie.Name != "SERVERID" {
 			cookie.Value = token
@@ -57,15 +62,13 @@ func (api *MobiAPI) TokenAuth(token string) (bool, error) {
 		return false, err
 	}
 
-	if resp.StatusCode == 200 {
-		return false, errors.New("AuthUnable")
-	} else if resp.Request.Response.StatusCode == 302 {
+	if resp.Request.URL.Path == "/dziennik/historia" {
 		api.signedin = true
 		api.postlogin(doc)
 		return true, nil
+	} else {
+		return false, errors.New("AuthUnable")
 	}
-
-	return false, nil
 }
 
 // Check if still signed in

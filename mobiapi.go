@@ -58,7 +58,7 @@ func (api *MobiAPI) SetDomain(domain string) error {
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 || resp.Request.URL.Path == "/zlyadres.php" {
 		return errors.New("Inaccessible")
 	}
 	return nil
@@ -87,7 +87,7 @@ func (api *MobiAPI) SetupProxy(proxyurl string, noverifytls bool) error {
 			Proxy:           http.ProxyURL(parsedurl),
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: noverifytls},
 		}
-		if _, err := api.client.Get("https://mobidziennik.pl"); err != nil {
+		if _, err := api.client.Get("https://www.mobidziennik.pl"); err != nil {
 			api.client.Transport = &http.Transport{}
 			return err
 		}
