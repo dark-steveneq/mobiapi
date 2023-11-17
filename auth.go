@@ -70,20 +70,3 @@ func (api *MobiAPI) TokenAuth(token string) (bool, error) {
 		return false, errors.New("AuthUnable")
 	}
 }
-
-// Check if still signed in
-func (api *MobiAPI) LoggedIn(noprecache bool) bool {
-	if noprecache {
-		_, _, err := api.request("GET", "", "")
-		if err != nil {
-			return false
-		}
-	}
-	return api.signedin
-}
-
-// Does a random request to extend session
-func (api *MobiAPI) ExtendSession() error {
-	_, _, err := api.request("POST", "", "")
-	return err
-}

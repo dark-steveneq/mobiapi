@@ -140,12 +140,16 @@ func (api *MobiAPI) GetMessageContent(message MessageInfo) (MessageContent, erro
 		return messagecontent, errors.New("NotFound")
 	}
 
-	contents := doc.Find(".wiadomosc_tresc").Children().First()
+	contents := doc.Find(".wiadomosc_tresc")
+	contents.Children().Last().Remove()
 	messagecontent.RawContent, err = contents.Html()
 	if err != nil {
 		return messagecontent, err
 	}
-	messagecontent.Content = contents.Text()
+	messagecontent.Content = ""
+	contents.Children().Each(func(i int, s *goquery.Selection) {
+		messagecontent.Content += s.Text() + "\n"
+	})
 
 	if doc.Find("#zalaczniki").Length() == 1 {
 		messagecontent.Downloads = map[string]string{}

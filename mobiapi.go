@@ -2,10 +2,12 @@ package mobiapi
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -17,6 +19,8 @@ type MobiAPI struct {
 	name     string
 	uid      int
 	signedin bool
+
+	OnLostConnection func()
 }
 
 func (api *MobiAPI) request(method string, path string, body string) (*http.Response, *goquery.Document, error) {
@@ -44,6 +48,9 @@ func (api *MobiAPI) request(method string, path string, body string) (*http.Resp
 		return resp, doc, err
 	}
 	_, api.signedin = doc.Find("body").Attr("uid")
+	if !api.signedin && api.OnLostConnection != nil {
+		api.OnLostConnection()
+	}
 
 	return resp, doc, nil
 }
@@ -93,6 +100,34 @@ func (api *MobiAPI) SetupProxy(proxyurl string, noverifytls bool) error {
 		}
 	}
 	return nil
+}
+
+// Check if still signed in
+func (api *MobiAPI) LoggedIn(noprecache bool) bool {
+	if noprecache {
+		resp, err := api.client.Get("https://" + api.domain + "/helper/sprawdzzalogowanie?uid=" + strconv.Itoa(api.GetUID()) + "&extendSession=0")
+		if err != nil {
+			return false
+		}
+		str := make([]byte, 128)
+		n, err := resp.Body.Read(str)
+		if err != nil {
+			return false
+		}
+		data := map[string]int{}
+		json.Unmarshal(str[:n], &data)
+		if v, ok := data["zalogowany"]; ok && v == 1 {
+			return true
+		}
+		return false
+	}
+	return api.signedin
+}
+
+// Does a random request to extend session
+func (api *MobiAPI) ExtendSession() error {
+	_, _, err := api.request("POST", "", "")
+	return err
 }
 
 // Logout from mobiDziennik
