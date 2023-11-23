@@ -138,7 +138,6 @@ func (api *MobiAPI) Logout() (bool, error) {
 	}
 	if resp.Request.Response.StatusCode == 302 {
 		api = nil
-		api.signedin = false
 		return true, nil
 	}
 	return false, nil

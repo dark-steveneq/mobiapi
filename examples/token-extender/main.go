@@ -31,7 +31,10 @@ func main() {
 		os.Exit(1)
 	} else if !signedin {
 		fmt.Println("Couldn't sign in!")
+		os.Exit(1)
 	}
+
+	defer api.Logout()
 
 	for {
 		time.Sleep(5 * time.Minute)
